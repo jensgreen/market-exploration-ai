@@ -1,0 +1,10 @@
+# Binaries
+/bin
+
+# Eclipse files
+.classpath
+.project
+.settings/
+
+# RoboRescue results
+test-results/
