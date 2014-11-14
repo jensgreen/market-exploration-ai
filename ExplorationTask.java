@@ -20,4 +20,9 @@ public final class ExplorationTask {
 		}
 		return false;
 	}
+	
+	@Override
+	public String toString() {
+		return "<Task: " + goal.toString() + ">";
+	}
 }

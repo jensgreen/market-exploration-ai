@@ -31,5 +31,10 @@ public final class Bid implements Comparable<Bid> {
 		return this.value - o.value;
 	}
 	
+	@Override
+	public String toString() {
+		return "<Bid: " + bidder.toString() + ", " + item.goal.toString() + ", $" + value + ">";
+	}
+	
 	
 }
