@@ -1,7 +1,11 @@
 package exploration;
 
+import java.io.UnsupportedEncodingException;
+
+import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.EntityID;
 
+// Message string: "bi:<item>:<value>"
 public final class Bid implements Comparable<Bid> {
 	public final EntityID bidder;
 	public final ExplorationTask item;
@@ -33,7 +37,33 @@ public final class Bid implements Comparable<Bid> {
 	
 	@Override
 	public String toString() {
-		return "<Bid: " + bidder.toString() + ", " + item.goal.toString() + ", $" + value + ">";
+		return "<Bid: @" + bidder.toString() + ", ->" + item.goal.toString() + ", $" + value + ">";
+	}
+	
+	public String toMessageString() {
+		StringBuilder sb = new StringBuilder("bi:");
+		sb.append(item.goal.toString());
+		sb.append(":");
+		sb.append(value);
+		return sb.toString();
+	}
+	
+	public static final Bid fromMessage(AKSpeak msg) {
+		String str = null;
+		try {
+			str = new String(msg.getContent(), "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			// Rethrow to detect when and if this fails.
+			throw new RuntimeException("Cannot parse message content",e);
+		}
+		String[] split = str.split(":");
+		// split == [String commandID, EntityID int item, int value]
+		
+		EntityID bidder = msg.getAgentID();
+		EntityID itemID = new EntityID(Integer.parseInt(split[1]));
+		ExplorationTask item = new ExplorationTask(itemID);
+		int value = Integer.parseInt(split[2]);
+		return new Bid(bidder, item, value);
 	}
 	
 	
