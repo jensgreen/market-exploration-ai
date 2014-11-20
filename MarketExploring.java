@@ -7,7 +7,7 @@ public interface MarketExploring {
     public int cost(ExplorationTask goal);
     public void broadcast(Bid bid);
     public void broadcast(AuctionOpening opening);
-	public AuctionOpening openAuction(ExplorationTask item, int reservePrice, int expectedNumBids);
+	public AuctionOpening openAuction(Auction au);
 	public void placeBid(AuctionOpening ao, int bid);
 
 }

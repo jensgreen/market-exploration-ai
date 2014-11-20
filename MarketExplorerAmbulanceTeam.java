@@ -1,6 +1,7 @@
 package exploration;
 
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedList;
@@ -8,8 +9,6 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 
-import myPackage.Astar;
-import rescuecore2.log.Logger;
 import rescuecore2.messages.Command;
 import rescuecore2.standard.entities.AmbulanceTeam;
 import rescuecore2.standard.entities.StandardEntity;
@@ -25,11 +24,13 @@ import exploration.ExplorationTask;
 import exploration.MarketExploring;
 
 public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTeam> implements MarketExploring {
+	private static final int MAX_TASK_QUEUE_LENGTH = 4;
 	private static final int MARKET_CHANNEL = 2;
-	private final Queue<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
+	
+	private final List<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
 	private final List<Auction> ownAuctions = new LinkedList<Auction>();
 	private final Queue<String> marketMessages = new LinkedList<String>();
-	private Astar astar;
+	private LinkedList<ExplorationTask> tour;
 	private int time; // save time so we can log it in log()
 	
 	public void log(String s) {
@@ -58,22 +59,25 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         super.postConnect();
         log("Connected");
         model.indexClass(StandardEntityURN.CIVILIAN, StandardEntityURN.FIRE_BRIGADE, StandardEntityURN.POLICE_FORCE, StandardEntityURN.AMBULANCE_TEAM, StandardEntityURN.REFUGE,StandardEntityURN.HYDRANT,StandardEntityURN.GAS_STATION, StandardEntityURN.BUILDING);
-        this.astar = new Astar(model);
         init();
     }
 
 	private void init() {
 		tasks.addAll(generateRandomTasks(3)); //TODO set number
-//		removeUnwantedTasks(this.tasks);
+		removeUnwantedTasks(tasks);
+		createAndBroadcastAuctions(tasks);
+		tour = Tour.greedy(tasks, getID(), model);
+	}
+
+	private void createAndBroadcastAuctions(List<ExplorationTask> tasks) {
 		for (ExplorationTask task : tasks) {
 			int cost = cost(task);
-			broadcast(openAuction(task, cost, 99999)); // TODO limit num.
+			broadcast(openAuction(new Auction(getID(), task, cost, 99999))); // TODO limit num.
 		}
 	}
 
     private void removeUnwantedTasks(Collection<ExplorationTask> tasks) {
-		// TODO Auto-generated method stub
-		
+    	// TODO waiting for ambulance center impl. 
 	}
 
 	@Override
@@ -88,12 +92,14 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	// Send ONE market message if there are any waiting.
     	if (!marketMessages.isEmpty()) {
     		String msg = marketMessages.remove();
-    		log("sending (t="+time+") " + msg);
+    		log("sending + \"" + msg + "\"");
 			sendSpeak(time, MARKET_CHANNEL, msg.getBytes());
 		}
 
-    	if (reachedGoal()) {
-    		updateGoals();
+    	if (reachedGoal(tour.peek().goal)) {
+    		log("reached goal " + tour.peek());
+    		tour.poll();
+    		updateTasksAndTour(tasks, tour);
     	}
     	
         for (Command next : heard) {
@@ -138,17 +144,16 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 		
 	}
 
-	private void updateGoals() {
-		joinTasks(generateRandomTasks(3)); // TODO num should be based on current number of tasks
-	}
-
-	private void joinTasks(List<ExplorationTask> newTasks) {
+	private void updateTasksAndTour(List<ExplorationTask> tasks, LinkedList<ExplorationTask> tour) {
+		int numNewTasks = MAX_TASK_QUEUE_LENGTH - tasks.size();
+		List<ExplorationTask> newTasks = generateRandomTasks(numNewTasks);
+		createAndBroadcastAuctions(newTasks);
 		this.tasks.addAll(newTasks);
+		this.tour = Tour.greedy(tasks, getID(), model);
 	}
 
-	private boolean reachedGoal() {
-		// TODO Auto-generated method stub
-		return false;
+	private boolean reachedGoal(EntityID goal) {
+		return (model.getDistance(getID(), goal) < 200);
 	}
 
 	private void handleBid(AKSpeak cmd) {
@@ -177,7 +182,9 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     }
 
 	@Override
-	public List<ExplorationTask> generateRandomTasks(int num) {		
+	public List<ExplorationTask> generateRandomTasks(int num) {
+		if (num == 0) return new ArrayList<ExplorationTask>();
+		
 		// Get all buidlings and roads
 		final List<StandardEntity> candidates = new LinkedList<StandardEntity>
 		(model.getEntitiesOfType(StandardEntityURN.BUILDING, StandardEntityURN.ROAD));
@@ -203,11 +210,12 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	}
 
 	@Override
-	public AuctionOpening openAuction(ExplorationTask item, int reservePrice, int expectedNumBids) {
-		Auction au = new Auction(getID(), item, reservePrice, expectedNumBids);
+	public AuctionOpening openAuction(Auction au) {
 		ownAuctions.add(au);
 		log("Opening auction: " + au.toString());
-		return au.open();
+		AuctionOpening opening = au.open();
+		broadcast(opening);
+		return opening;
 	}
 
 	@Override
