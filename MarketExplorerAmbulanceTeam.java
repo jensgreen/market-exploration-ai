@@ -184,7 +184,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	@Override
 	public List<ExplorationTask> generateRandomTasks(int num) {
 		if (num == 0) return new ArrayList<ExplorationTask>();
-		
+
 		// Get all buidlings and roads
 		final List<StandardEntity> candidates = new LinkedList<StandardEntity>
 		(model.getEntitiesOfType(StandardEntityURN.BUILDING, StandardEntityURN.ROAD));
