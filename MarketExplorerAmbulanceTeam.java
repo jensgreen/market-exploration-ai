@@ -17,20 +17,16 @@ import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
 import sample.AbstractSampleAgent;
-import exploration.Auction;
-import exploration.AuctionOpening;
-import exploration.Bid;
-import exploration.ExplorationTask;
-import exploration.MarketExploring;
+import sample.SampleSearch;
 
 public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTeam> implements MarketExploring {
-	private static final int MAX_TASK_QUEUE_LENGTH = 4;
+	private static final int MAX_TASKS = 4;
 	private static final int MARKET_CHANNEL = 2;
 	
-	private final List<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
 	private final List<Auction> ownAuctions = new LinkedList<Auction>();
 	private final Queue<String> marketMessages = new LinkedList<String>();
 	private LinkedList<ExplorationTask> tour;
+	private ExplorationTask currentTask;
 	private int time; // save time so we can log it in log()
 	
 	public void log(String s) {
@@ -63,16 +59,18 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     }
 
 	private void init() {
-		tasks.addAll(generateRandomTasks(3)); //TODO set number
+		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
+		tasks.addAll(generateRandomTasks(MAX_TASKS));
 		removeUnwantedTasks(tasks);
-		createAndBroadcastAuctions(tasks);
+		createAuctions(tasks);
 		tour = Tour.greedy(tasks, getID(), model);
+		currentTask = tour.poll();
 	}
 
-	private void createAndBroadcastAuctions(List<ExplorationTask> tasks) {
+	private void createAuctions(List<ExplorationTask> tasks) {
 		for (ExplorationTask task : tasks) {
 			int cost = cost(task);
-			broadcast(openAuction(new Auction(getID(), task, cost, 99999))); // TODO limit num.
+			openAuction(new Auction(getID(), task, cost, 99999)); // TODO limit num.
 		}
 	}
 
@@ -92,14 +90,23 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	// Send ONE market message if there are any waiting.
     	if (!marketMessages.isEmpty()) {
     		String msg = marketMessages.remove();
-    		log("sending + \"" + msg + "\"");
+    		log("sending: \"" + msg + "\"");
 			sendSpeak(time, MARKET_CHANNEL, msg.getBytes());
 		}
 
-    	if (reachedGoal(tour.peek().goal)) {
-    		log("reached goal " + tour.peek());
-    		tour.poll();
-    		updateTasksAndTour(tasks, tour);
+    	if (reachedGoal(currentTask.goal)) {
+    		log("reached goal " + currentTask.goal);
+    		
+    		currentTask = null;
+    		updateTasksAndTour(tour);
+    		currentTask = tour.poll();
+    	}
+    	else {
+            EntityID pos = me().getPosition();
+    		log("moving: " + pos + " --> " + currentTask.goal);
+            List<EntityID> path = new SampleSearch(model).
+            		breadthFirstSearch(pos, currentTask.goal);
+			sendMove(time, path);
     	}
     	
         for (Command next : heard) {
@@ -111,7 +118,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 				// Rethrow to detect when and if this fails.
 				throw new RuntimeException("Cannot parse message content",e);
 			}
-        	log("heard: " + msg);
+//        	log("heard: " + msg);
 			
             if (isBid(msg)) {
             	handleBid(cmd);
@@ -144,16 +151,20 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 		
 	}
 
-	private void updateTasksAndTour(List<ExplorationTask> tasks, LinkedList<ExplorationTask> tour) {
-		int numNewTasks = MAX_TASK_QUEUE_LENGTH - tasks.size();
-		List<ExplorationTask> newTasks = generateRandomTasks(numNewTasks);
-		createAndBroadcastAuctions(newTasks);
-		this.tasks.addAll(newTasks);
+	private void updateTasksAndTour(LinkedList<ExplorationTask> tour) {
+		int numNewTasks = MAX_TASKS - tour.size();
+		log("generating " + numNewTasks + "new tasks");
+		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>(tour);
+		tasks.addAll(generateRandomTasks(numNewTasks));
 		this.tour = Tour.greedy(tasks, getID(), model);
+		this.currentTask = tour.poll();
+		createAuctions(tour);
 	}
 
 	private boolean reachedGoal(EntityID goal) {
-		return (model.getDistance(getID(), goal) < 200);
+		// TODO  what condition to use?
+//		return me().getPosition().equals(goal);
+		return (model.getDistance(getID(), goal) < 1000);
 	}
 
 	private void handleBid(AKSpeak cmd) {
