@@ -54,7 +54,8 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     protected void postConnect() {
         super.postConnect();
         log("Connected");
-        model.indexClass(StandardEntityURN.CIVILIAN, StandardEntityURN.FIRE_BRIGADE, StandardEntityURN.POLICE_FORCE, StandardEntityURN.AMBULANCE_TEAM, StandardEntityURN.REFUGE,StandardEntityURN.HYDRANT,StandardEntityURN.GAS_STATION, StandardEntityURN.BUILDING);
+        //TODO look over this list
+        model.indexClass(StandardEntityURN.CIVILIAN, StandardEntityURN.FIRE_BRIGADE, StandardEntityURN.POLICE_FORCE, StandardEntityURN.AMBULANCE_TEAM, StandardEntityURN.REFUGE,StandardEntityURN.HYDRANT,StandardEntityURN.GAS_STATION, StandardEntityURN.BUILDING, StandardEntityURN.ROAD);
         init();
     }
 
@@ -111,6 +112,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	
         for (Command next : heard) {
 			AKSpeak cmd = parseCommand(next);
+			if (cmd.getAgentID().equals(getID())) continue; // skip own messages
 			String msg = null;
 			try {
 				msg = new String(cmd.getContent(), "UTF-8");
@@ -201,7 +203,8 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 		(model.getEntitiesOfType(StandardEntityURN.BUILDING, StandardEntityURN.ROAD));
 		
 		final List<ExplorationTask> list = new LinkedList<ExplorationTask>();
-		final Random rnd = new Random(this.getID().getValue()); // TODO remove seed
+		final int seed = this.getID().getValue() + Integer.valueOf(time).hashCode();
+		final Random rnd = new Random(seed); // TODO remove seed
 		
 		// choose entities randomly
 		for (int i = 0; i < num; i++) {
