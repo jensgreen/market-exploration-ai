@@ -63,9 +63,9 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
 		tasks.addAll(generateRandomTasks(MAX_TASKS));
 		removeUnwantedTasks(tasks);
-		createAuctions(tasks);
 		tour = Tour.greedy(tasks, getID(), model);
 		currentTask = tour.poll();
+		createAuctions(tour);
 	}
 
 	private void createAuctions(List<ExplorationTask> tasks) {
