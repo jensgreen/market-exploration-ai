@@ -25,7 +25,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	
 	private final List<Auction> ownAuctions = new LinkedList<Auction>();
 	private final Queue<String> marketMessages = new LinkedList<String>();
-	private LinkedList<ExplorationTask> tour;
+	private LinkedList<ExplorationTask> tour = new LinkedList<ExplorationTask>();
 	private ExplorationTask currentTask;
 	private int time; // save time so we can log it in log()
 	
@@ -60,12 +60,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     }
 
 	private void init() {
-		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
-		tasks.addAll(generateRandomTasks(MAX_TASKS));
-		removeUnwantedTasks(tasks);
-		tour = Tour.greedy(tasks, getID(), model);
-		currentTask = tour.poll();
-		createAuctions(tour);
+		onGoal(); // do whatever we would have done at a subgoal
 	}
 
 	private void createAuctions(List<ExplorationTask> tasks) {
@@ -97,10 +92,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 
     	if (reachedGoal(currentTask.goal)) {
     		log("reached goal " + currentTask.goal);
-    		
-    		currentTask = null;
-    		updateTasksAndTour(tour);
-    		currentTask = tour.poll();
+    		onGoal();
     	}
     	else {
             EntityID pos = me().getPosition();
@@ -153,12 +145,16 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 		
 	}
 
-	private void updateTasksAndTour(LinkedList<ExplorationTask> tour) {
+	private void onGoal() {
+		// generate new tasks, add current tasks
 		int numNewTasks = MAX_TASKS - tour.size();
 		log("generating " + numNewTasks + "new tasks");
 		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>(tour);
 		tasks.addAll(generateRandomTasks(numNewTasks));
+		removeUnwantedTasks(tasks);
+		// order tasks into tour
 		this.tour = Tour.greedy(tasks, getID(), model);
+		// set current goal, then auction the rest
 		this.currentTask = tour.poll();
 		createAuctions(tour);
 	}
