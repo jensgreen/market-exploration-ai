@@ -49,6 +49,15 @@ public final class AuctionOpening {
 	}
 	
 	@Override
+	public boolean equals(Object obj) {
+		if (obj instanceof AuctionOpening) {
+			AuctionOpening ao = (AuctionOpening) obj;
+			return this.item.equals(ao.item) && this.reservePrice == ao.reservePrice && this.auctioneer.equals(ao.auctioneer);
+		}
+		return false;
+	}
+	
+	@Override
 	public String toString() {
 		return "<AuctionOpening: @" + auctioneer.toString() + ", ->" + item.goal.toString() + ", $" + reservePrice + ">";
 	}

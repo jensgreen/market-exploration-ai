@@ -18,6 +18,8 @@ import rescuecore2.worldmodel.EntityID;
 public class MarketComponent {
 	public static final int MARKET_CHANNEL = 2;
 	private static final int MAX_TASKS = 4;
+	private static final boolean ALWAYS_PLACE_BID = true;
+	private static final int EXPECTED_NUM_BIDS = 3;
 	private List<Auction> auctions = new LinkedList<Auction>();
 	private Queue<String> marketMessages = new LinkedList<String>();
 	private LinkedList<ExplorationTask> tour = new LinkedList<ExplorationTask>();
@@ -81,27 +83,38 @@ public class MarketComponent {
 		System.out.println(sb.toString());
 	}
 	
-	// Keep track of the time
-	public int tick(int time) {
+	public void tick(int time) {
 		this.time = time;
-		return this.time;
+		
+		
+		
+		
 	}
 
 	public void handleBid(AKSpeak cmd) {
     	Bid bid = Bid.fromMessage(cmd);
     	for (Auction a : auctions) {
-
 			if (a.item.equals(bid.item)) {
 				log("Received bid on " + a.toString() + ". Bidder: " + bid.bidder.toString());
 				a.addBid(bid);
 				if(a.numBids() >= a.expectedNumBids()) {
-					a.close();
+					AuctionClosing closing = a.close();
+					sell(closing);
 				}
 				break;
 			}
 		}
 	}
 	
+	private void sell(AuctionClosing closing) {
+		if (closing.winner.equals(this.getID())) {
+			// TODO do nothing?
+		}
+		else {
+			broadcast(closing);
+		}
+	}
+
 	public List<ExplorationTask> generateRandomTasks(int num) {
 		if (num == 0) return new ArrayList<ExplorationTask>();
 
@@ -150,6 +163,11 @@ public class MarketComponent {
 	public void broadcast(AuctionOpening opening) {
 		marketMessages.add(opening.toMessageString());
 	}
+
+
+	private void broadcast(AuctionClosing closing) {
+		marketMessages.add(closing.toMessageString());
+	}
 	
 	public AKSpeak parseCommand(Command next) {
 		return ((AKSpeak)next);
@@ -162,7 +180,7 @@ public class MarketComponent {
 	public void handleAuctionOpening(AKSpeak cmd) {
 		AuctionOpening ao = AuctionOpening.fromMessage(cmd);
 		int cost = cost(ao.item);
-		if (cost < ao.reservePrice) {
+		if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
 			placeBid(ao, cost);
 		} else {
 			log("Did not place bid. Cost=" + cost + " reserve=" + ao.reservePrice);
@@ -183,7 +201,7 @@ public class MarketComponent {
 	private void createAuctions(List<ExplorationTask> tasks) {
 		for (ExplorationTask task : tasks) {
 			int cost = cost(task);
-			openAuction(new Auction(getID(), task, cost, 99999)); // TODO limit num.
+			openAuction(new Auction(getID(), task, cost, EXPECTED_NUM_BIDS)); // TODO limit num.
 		}
 	}
 

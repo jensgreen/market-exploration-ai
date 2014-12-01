@@ -4,12 +4,11 @@ import java.util.PriorityQueue;
 
 import rescuecore2.worldmodel.EntityID;
 
-public class Auction {
+public final class Auction {
 	
 	public final ExplorationTask item;
-	
 	// Bids are sorted by value: highest --> lowest
-	public final PriorityQueue<Bid> bids = new PriorityQueue<Bid>();
+	private final PriorityQueue<Bid> bids = new PriorityQueue<Bid>();
 	private final int expectedNumBids;
 	private final int reservePrice;
 	private final EntityID auctioneer;
@@ -23,6 +22,9 @@ public class Auction {
 		this.auctioneer = auctioneer;
 		this.reservePrice = reservePrice;
 		this.expectedNumBids = expectedBids;
+		
+		Bid ownBid = new Bid(auctioneer, item, reservePrice);
+		bids.add(ownBid);
 	}
 	
 	public void addBid(Bid bid) {
@@ -33,11 +35,11 @@ public class Auction {
 		return new AuctionOpening(auctioneer, item, reservePrice);
 	}
 	
-	public void close() {
-		// TODO keep?
+	public AuctionClosing close() {
+		return new AuctionClosing(getBestBid());
 	}
 	
-	public Bid getBestBid() {
+	private Bid getBestBid() {
 		return bids.peek();
 	}
 	
