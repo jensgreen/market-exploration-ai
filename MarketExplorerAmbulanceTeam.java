@@ -42,19 +42,17 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         }
     	
     	// Send ONE market message if there are any waiting.
-    	if (!market.getMarketMessages().isEmpty()) {
-    		String msg = market.getMarketMessages().remove();
+    	if (market.hasMessage()) {
+    		String msg = market.nextMessage();
     		market.log("sending: \"" + msg + "\"");
 			sendSpeak(time, MarketComponent.MARKET_CHANNEL, msg.getBytes());
 		}
 
     	if (market.reachedGoal(market.getCurrentTask().goal)) {
-    		market.log("reached goal " + market.getCurrentTask().goal);
     		market.onGoal();
     	}
     	else {
             EntityID pos = me().getPosition();
-            market.log("moving: " + pos + " --> " + market.getCurrentTask().goal);
             List<EntityID> path = new SampleSearch(model).
             		breadthFirstSearch(pos, market.getCurrentTask().goal);
 			sendMove(time, path);
@@ -70,12 +68,14 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 				// Rethrow to detect when and if this fails.
 				throw new RuntimeException("Cannot parse message content",e);
 			}
-//        	log("heard: " + msg);
 			
             if (market.isBid(msg)) {
             	market.handleBid(cmd);
             } else if (market.isAuctionOpening(msg)) {
             	market.handleAuctionOpening(cmd);
+            } else if (market.isAuctionClosing(msg)) {
+            	market.log("Won auction!");
+            	market.handleAuctionClosing(cmd);
             }
         }
     }

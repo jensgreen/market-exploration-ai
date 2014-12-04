@@ -48,19 +48,35 @@ public class MarketComponent {
 	public void onGoal() {
 		// generate new tasks, add current tasks
 		int numNewTasks = MAX_TASKS - tour.size();
-		log("generating " + numNewTasks + "new tasks");
+		String onGoalString =
+				(currentTask == null ? "" : "On goal " + currentTask.toString() + ". ");
+		log(onGoalString + "Generating " + numNewTasks + " new tasks");
 		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>(tour);
 		tasks.addAll(generateRandomTasks(numNewTasks));
 		removeUnwantedTasks(tasks);
 		// order tasks into tour
-		this.tour = Tour.greedy(tasks, getID(), model);
+		addToTour(tasks);
 		// set current goal, then auction the rest
 		this.currentTask = tour.poll();
 		createAuctions(tour);
 	}
 	
-	public Queue<String> getMarketMessages() {
-		return marketMessages;
+	private void addToTour(ExplorationTask task) {
+		List<ExplorationTask> list = new ArrayList<ExplorationTask>();
+		list.add(task);
+		this.tour = Tour.greedy(list , getID(), model);
+	}
+	
+	private void addToTour(List<ExplorationTask> tasks) {
+		this.tour = Tour.greedy(tasks , getID(), model);
+	}
+	
+	public String nextMessage() {
+		return marketMessages.poll();
+	}
+	
+	public boolean hasMessage() {
+		return !marketMessages.isEmpty();
 	}
 
 	public ExplorationTask getCurrentTask() {
@@ -74,7 +90,7 @@ public class MarketComponent {
 		final String idstr = this.getID().toString();
 		sb.append(idstr.substring(0, 2));
 		sb.append("-");
-		sb.append(idstr.substring(idstr.length()-1-2, idstr.length()-1));
+		sb.append(idstr.substring(idstr.length()-2, idstr.length()));
 		// ...and time...
 		sb.append(" (t="); sb.append(this.time); sb.append(")");
 		sb.append(": ");
@@ -85,32 +101,15 @@ public class MarketComponent {
 	
 	public void tick(int time) {
 		this.time = time;
-		
-		
-		
-		
-	}
-
-	public void handleBid(AKSpeak cmd) {
-    	Bid bid = Bid.fromMessage(cmd);
-    	for (Auction a : auctions) {
-			if (a.item.equals(bid.item)) {
-				log("Received bid on " + a.toString() + ". Bidder: " + bid.bidder.toString());
-				a.addBid(bid);
-				if(a.numBids() >= a.expectedNumBids()) {
-					AuctionClosing closing = a.close();
-					sell(closing);
-				}
-				break;
-			}
-		}
 	}
 	
 	private void sell(AuctionClosing closing) {
 		if (closing.winner.equals(this.getID())) {
 			// TODO do nothing?
+			log("Selling to self: " + closing.toString());
 		}
 		else {
+			log("Selling to other: " + closing.toString());
 			broadcast(closing);
 		}
 	}
@@ -134,7 +133,7 @@ public class MarketComponent {
 			candidates.remove(r);
 		}
 		
-		log("generated tasks: " + list.toString());
+//		log("Generated tasks: " + list.toString());
 		return list;
 	}
 
@@ -144,7 +143,7 @@ public class MarketComponent {
 
 	public AuctionOpening openAuction(Auction au) {
 		auctions.add(au);
-		log("Opening auction: " + au.toString());
+//		log("Opening auction: " + au.toString());
 		AuctionOpening opening = au.open();
 		broadcast(opening);
 		return opening;
@@ -152,15 +151,15 @@ public class MarketComponent {
 
 	public void placeBid(AuctionOpening ao, int price) {
 		Bid bid = new Bid(getID(), ao.item, price);
-		log("Bidded on "+ ao.toString() + ". Bid=" + price + " reserve=" + ao.reservePrice);
+//		log("Bidded on "+ ao.toString() + ". Bid=" + price + " reserve=" + ao.reservePrice);
 		broadcast(bid);
 	}
 
-	public void broadcast(Bid bid) {
+	private void broadcast(Bid bid) {
 		marketMessages.add(bid.toMessageString());
 	}
 
-	public void broadcast(AuctionOpening opening) {
+	private void broadcast(AuctionOpening opening) {
 		marketMessages.add(opening.toMessageString());
 	}
 
@@ -173,8 +172,23 @@ public class MarketComponent {
 		return ((AKSpeak)next);
 	}
 
-    public boolean isAuctionOpening(String msg) {
-    	return msg.startsWith("ao:");
+	public void handleBid(AKSpeak cmd) {
+    	Bid bid = Bid.fromMessage(cmd);
+    	for (Auction a : auctions) {
+			if (a.item.equals(bid.item)) {
+				// Found auction.
+				// Add bid, (close auction), then return
+				
+//				log("Received bid on " + a.toString() + ". Bidder: " + bid.bidder.toString());
+				a.addBid(bid);
+				if(a.numBids() >= a.expectedNumBids()) {
+					AuctionClosing closing = a.close();
+					sell(closing);
+					auctions.remove(a);
+				}
+				return;
+			}
+		}
 	}
 
 	public void handleAuctionOpening(AKSpeak cmd) {
@@ -183,9 +197,16 @@ public class MarketComponent {
 		if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
 			placeBid(ao, cost);
 		} else {
-			log("Did not place bid. Cost=" + cost + " reserve=" + ao.reservePrice);
+//			log("Did not place bid. Cost=" + cost + " reserve=" + ao.reservePrice);
 		}
-		
+	}
+	
+	public void handleAuctionClosing(AKSpeak cmd) {
+		AuctionClosing ac = AuctionClosing.fromMessage(cmd);
+		log("Check: " + ac.toString() + " ==? " + getID());
+		if (ac.winner.equals(this.getID())) return; // someone elses bid
+		addToTour(ac.item);
+		log("Won auction ->" + ac.item.goal.toString() + ". Added to tour.");
 	}
 
 	public boolean reachedGoal(EntityID goal) {
@@ -197,6 +218,15 @@ public class MarketComponent {
 	public boolean isBid(String msg) {
 		return msg.startsWith("bi:");
 	}
+
+    public boolean isAuctionOpening(String msg) {
+    	return msg.startsWith("ao:");
+    }
+
+	public boolean isAuctionClosing(String msg) {
+		return msg.startsWith("ac:");
+	}
+	
 	
 	private void createAuctions(List<ExplorationTask> tasks) {
 		for (ExplorationTask task : tasks) {
@@ -208,7 +238,6 @@ public class MarketComponent {
     private void removeUnwantedTasks(Collection<ExplorationTask> tasks) {
     	// TODO waiting for ambulance center impl. 
 	}
-	
 	
 	
 }
