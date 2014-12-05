@@ -5,6 +5,7 @@ import java.util.PriorityQueue;
 import rescuecore2.worldmodel.EntityID;
 
 public final class Auction {
+	public static final int AUCTION_DURATION = 10;
 	
 	public final ExplorationTask item;
 	// Bids are sorted by value: highest --> lowest
@@ -12,16 +13,19 @@ public final class Auction {
 	private final int expectedNumBids;
 	private final int reservePrice;
 	private final EntityID auctioneer;
+	private final int deadline;
 	
-	public Auction(EntityID auctioneer, ExplorationTask item, int reservePrice, int expectedBids) {
+	public Auction(EntityID auctioneer, ExplorationTask item, int reservePrice, int deadline, int expectedBids) {
 		if (item == null) throw new IllegalArgumentException("item cannot be null");
 		if (auctioneer == null) throw new IllegalArgumentException("auctioneer cannot be null");
 		if (reservePrice < 0) throw new IllegalArgumentException("reservePrive cannot be < 0");
+		if (deadline < 0) throw new IllegalArgumentException("deadline cannot be < 0");
 
 		this.item = item;
 		this.auctioneer = auctioneer;
 		this.reservePrice = reservePrice;
 		this.expectedNumBids = expectedBids;
+		this.deadline = deadline;
 		
 		Bid ownBid = new Bid(auctioneer, item, reservePrice);
 		bids.add(ownBid);
@@ -51,7 +55,15 @@ public final class Auction {
 		return expectedNumBids;
 	}
 	
+	public boolean timeout(int time) {
+		return (time >= this.deadline);
+	}
+	
 	public String toString() {
 		return "<Auction: @" + auctioneer.toString() + ", ->" + item.goal.toString() + ", $" + reservePrice + ">";
+	}
+	
+	public static int getDeadline(int now) {
+		return now + Auction.AUCTION_DURATION;
 	}
 }

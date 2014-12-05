@@ -35,6 +35,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	@Override
     protected void think(int time, ChangeSet changed, Collection<Command> heard) {
 		market.tick(time);
+		market.updateWorld(changed);
 //    	log("thinking...");
     	
     	if (time == config.getIntValue(kernel.KernelConstants.IGNORE_AGENT_COMMANDS_KEY)) {
@@ -74,7 +75,6 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
             } else if (market.isAuctionOpening(msg)) {
             	market.handleAuctionOpening(cmd);
             } else if (market.isAuctionClosing(msg)) {
-            	market.log("Won auction!");
             	market.handleAuctionClosing(cmd);
             }
         }

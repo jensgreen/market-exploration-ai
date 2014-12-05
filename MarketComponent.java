@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.Set;
 
 import rescuecore2.messages.Command;
 import rescuecore2.standard.entities.AmbulanceTeam;
@@ -13,23 +14,26 @@ import rescuecore2.standard.entities.StandardEntity;
 import rescuecore2.standard.entities.StandardEntityURN;
 import rescuecore2.standard.entities.StandardWorldModel;
 import rescuecore2.standard.messages.AKSpeak;
+import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
+import rescuecore2.worldmodel.Property;
 
 public class MarketComponent {
 	public static final int MARKET_CHANNEL = 2;
-	private static final int MAX_TASKS = 4;
-	private static final boolean ALWAYS_PLACE_BID = true;
-	private static final int EXPECTED_NUM_BIDS = 3;
+	private static final int MAX_TASKS = 3;
+	private static final boolean ALWAYS_PLACE_BID = true; // debug variable
+	private static final int EXPECTED_NUM_BIDS = 3; // debug variable
+	
 	private List<Auction> auctions = new LinkedList<Auction>();
 	private Queue<String> marketMessages = new LinkedList<String>();
 	private LinkedList<ExplorationTask> tour = new LinkedList<ExplorationTask>();
 	private ExplorationTask currentTask;
 	private StandardWorldModel model;
-	private AmbulanceTeam ambulanceTeam;
+	private AmbulanceTeam agent;
 	private int time;
 
-	public MarketComponent(AmbulanceTeam ambulanceTeam, StandardWorldModel model) {
-		this.ambulanceTeam = ambulanceTeam;
+	public MarketComponent(AmbulanceTeam agent, StandardWorldModel model) {
+		this.agent = agent;
 		this.model = model;
 	}
 
@@ -38,7 +42,7 @@ public class MarketComponent {
 	}
 	
 	private AmbulanceTeam me() {
-		return ambulanceTeam;
+		return agent;
 	}
 	
 	private EntityID getID() {
@@ -101,6 +105,19 @@ public class MarketComponent {
 	
 	public void tick(int time) {
 		this.time = time;
+		
+		// end all auctions that have timed out
+		List<Auction> timedOut = new ArrayList<Auction>();
+		for (Auction a : auctions) {
+			if (a.timeout(time)) {
+				timedOut.add(a);
+			}
+		}
+		// second loop to avoid concurrent modification exception
+		for (Auction a : timedOut) {
+			log("Timed out: " + a.toString());
+			endAuction(a);
+		}
 	}
 	
 	private void sell(AuctionClosing closing) {
@@ -182,13 +199,17 @@ public class MarketComponent {
 //				log("Received bid on " + a.toString() + ". Bidder: " + bid.bidder.toString());
 				a.addBid(bid);
 				if(a.numBids() >= a.expectedNumBids()) {
-					AuctionClosing closing = a.close();
-					sell(closing);
-					auctions.remove(a);
+					endAuction(a);
 				}
 				return;
 			}
 		}
+	}
+
+	private void endAuction(Auction a) {
+		AuctionClosing closing = a.close();
+		sell(closing);
+		auctions.remove(a);
 	}
 
 	public void handleAuctionOpening(AKSpeak cmd) {
@@ -203,7 +224,6 @@ public class MarketComponent {
 	
 	public void handleAuctionClosing(AKSpeak cmd) {
 		AuctionClosing ac = AuctionClosing.fromMessage(cmd);
-		log("Check: " + ac.toString() + " ==? " + getID());
 		if (ac.winner.equals(this.getID())) return; // someone elses bid
 		addToTour(ac.item);
 		log("Won auction ->" + ac.item.goal.toString() + ". Added to tour.");
@@ -231,12 +251,21 @@ public class MarketComponent {
 	private void createAuctions(List<ExplorationTask> tasks) {
 		for (ExplorationTask task : tasks) {
 			int cost = cost(task);
-			openAuction(new Auction(getID(), task, cost, EXPECTED_NUM_BIDS)); // TODO limit num.
+			openAuction(new Auction(getID(), task, cost, Auction.getDeadline(time), EXPECTED_NUM_BIDS)); // TODO limit num.
 		}
 	}
 
     private void removeUnwantedTasks(Collection<ExplorationTask> tasks) {
     	// TODO waiting for ambulance center impl. 
+	}
+
+	public void updateWorld(ChangeSet changed) {
+		model.merge(changed);
+		
+		for (EntityID e : changed.getChangedEntities()) {
+			Set<Property> props = changed.getChangedProperties(e);
+			// TODO what to broadcast?
+		}
 	}
 	
 	
