@@ -18,7 +18,7 @@ public final class Auction {
 	public Auction(EntityID auctioneer, ExplorationTask item, int reservePrice, int deadline, int expectedBids) {
 		if (item == null) throw new IllegalArgumentException("item cannot be null");
 		if (auctioneer == null) throw new IllegalArgumentException("auctioneer cannot be null");
-		if (reservePrice < 0) throw new IllegalArgumentException("reservePrive cannot be < 0");
+		if (reservePrice < 0) throw new IllegalArgumentException("reservePrice cannot be < 0");
 		if (deadline < 0) throw new IllegalArgumentException("deadline cannot be < 0");
 
 		this.item = item;
@@ -57,6 +57,16 @@ public final class Auction {
 	
 	public boolean timeout(int time) {
 		return (time >= this.deadline);
+	}
+	
+	@Override
+	// Compare only auctioneer and item.
+	public boolean equals(Object obj) {
+		if (obj instanceof Auction) {
+			Auction other = (Auction) obj;
+			return this.auctioneer.equals(other.auctioneer) && this.item.equals(other.item);
+		}
+		return false;
 	}
 	
 	public String toString() {

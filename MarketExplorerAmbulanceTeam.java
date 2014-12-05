@@ -54,7 +54,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	}
     	else {
             EntityID pos = me().getPosition();
-            List<EntityID> path = new SampleSearch(model).
+            List<EntityID> path = search.
             		breadthFirstSearch(pos, market.getCurrentTask().goal);
 			sendMove(time, path);
     	}

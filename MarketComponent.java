@@ -20,16 +20,16 @@ import rescuecore2.worldmodel.Property;
 
 public class MarketComponent {
 	public static final int MARKET_CHANNEL = 2;
-	private static final int MAX_TASKS = 3;
+	private static final int MIN_TASKS = 4;
 	private static final boolean ALWAYS_PLACE_BID = true; // debug variable
-	private static final int EXPECTED_NUM_BIDS = 3; // debug variable
+	private static final int EXPECTED_NUM_BIDS = 3;
 	
-	private List<Auction> auctions = new LinkedList<Auction>();
-	private Queue<String> marketMessages = new LinkedList<String>();
-	private LinkedList<ExplorationTask> tour = new LinkedList<ExplorationTask>();
+	private final List<Auction> auctions = new LinkedList<Auction>();
+	private final Queue<String> marketMessages = new LinkedList<String>();
+	private final StandardWorldModel model;
+	private final AmbulanceTeam agent;
+	private Tour tour = Tour.empty();
 	private ExplorationTask currentTask;
-	private StandardWorldModel model;
-	private AmbulanceTeam agent;
 	private int time;
 
 	public MarketComponent(AmbulanceTeam agent, StandardWorldModel model) {
@@ -49,30 +49,39 @@ public class MarketComponent {
 		return me().getID();
 	}
 
+	/** Call when a subgoal is reached. Updates tour, current task. */
 	public void onGoal() {
-		// generate new tasks, add current tasks
-		int numNewTasks = MAX_TASKS - tour.size();
+		tour.getNodes().poll(); // poll to get correct count
+		int numNewTasks = MIN_TASKS - tour.getNodes().size();
+		numNewTasks = (numNewTasks < 0 ? 0 : numNewTasks);
+		
+		// Log for debugging
 		String onGoalString =
 				(currentTask == null ? "" : "On goal " + currentTask.toString() + ". ");
 		log(onGoalString + "Generating " + numNewTasks + " new tasks");
-		List<ExplorationTask> tasks = new LinkedList<ExplorationTask>(tour);
-		tasks.addAll(generateRandomTasks(numNewTasks));
-		removeUnwantedTasks(tasks);
-		// order tasks into tour
-		addToTour(tasks);
+		
+		// Generate new tasks
+		LinkedList<ExplorationTask> newTasks = new LinkedList<ExplorationTask>();
+		newTasks.addAll(generateRandomTasks(numNewTasks));
+		removeUnwantedTasks(newTasks);
+		
+		// create and order new tour with new tasks inserted
+		addToTour(newTasks);
 		// set current goal, then auction the rest
-		this.currentTask = tour.poll();
+		this.currentTask = tour.getNodes().poll();
 		createAuctions(tour);
 	}
 	
 	private void addToTour(ExplorationTask task) {
-		List<ExplorationTask> list = new ArrayList<ExplorationTask>();
+		List<ExplorationTask> list = this.tour.getNodes();
 		list.add(task);
-		this.tour = Tour.greedy(list , getID(), model);
+		this.tour = Tour.greedy(list, getID(), model);
 	}
 	
 	private void addToTour(List<ExplorationTask> tasks) {
-		this.tour = Tour.greedy(tasks , getID(), model);
+		List<ExplorationTask> list = this.tour.getNodes();
+		list.addAll(tasks);
+		this.tour = Tour.greedy(list, getID(), model);
 	}
 	
 	public String nextMessage() {
@@ -132,7 +141,7 @@ public class MarketComponent {
 	}
 
 	public List<ExplorationTask> generateRandomTasks(int num) {
-		if (num == 0) return new ArrayList<ExplorationTask>();
+		if (num <= 0) return new ArrayList<ExplorationTask>();
 
 		// Get all buidlings and roads
 		final List<StandardEntity> candidates = new LinkedList<StandardEntity>
@@ -154,13 +163,9 @@ public class MarketComponent {
 		return list;
 	}
 
-	public int cost(ExplorationTask task) {
-		return model.getDistance(me().getPosition(), task.goal);
-	}
-
 	public AuctionOpening openAuction(Auction au) {
 		auctions.add(au);
-//		log("Opening auction: " + au.toString());
+		log("Opening auction: " + au.toString());
 		AuctionOpening opening = au.open();
 		broadcast(opening);
 		return opening;
@@ -214,7 +219,7 @@ public class MarketComponent {
 
 	public void handleAuctionOpening(AKSpeak cmd) {
 		AuctionOpening ao = AuctionOpening.fromMessage(cmd);
-		int cost = cost(ao.item);
+		int cost = tour.costToAdd(ao.item.goal, model);
 		if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
 			placeBid(ao, cost);
 		} else {
@@ -224,7 +229,7 @@ public class MarketComponent {
 	
 	public void handleAuctionClosing(AKSpeak cmd) {
 		AuctionClosing ac = AuctionClosing.fromMessage(cmd);
-		if (ac.winner.equals(this.getID())) return; // someone elses bid
+		if (!ac.winner.equals(this.getID())) return; // someone elses bid
 		addToTour(ac.item);
 		log("Won auction ->" + ac.item.goal.toString() + ". Added to tour.");
 	}
@@ -248,10 +253,17 @@ public class MarketComponent {
 	}
 	
 	
-	private void createAuctions(List<ExplorationTask> tasks) {
-		for (ExplorationTask task : tasks) {
-			int cost = cost(task);
-			openAuction(new Auction(getID(), task, cost, Auction.getDeadline(time), EXPECTED_NUM_BIDS)); // TODO limit num.
+	private void createAuctions(Tour tour) {
+		LinkedList<ExplorationTask> nodes = tour.getNodes();
+		for (int i = 0; i < nodes.size(); i++) {
+			int cost = tour.getCosts(i);
+			ExplorationTask task = nodes.get(i);
+			// TODO limit num bids better
+			Auction auc = new Auction(getID(), task , cost, Auction.getDeadline(time), EXPECTED_NUM_BIDS);
+			
+			// Dont open again if it has been opened already earlier.
+			if (!auctions.contains(auc))
+				openAuction(auc); 
 		}
 	}
 
