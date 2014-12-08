@@ -15,8 +15,6 @@ import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
 import sample.AbstractSampleAgent;
-import sample.SampleSearch;
-import sun.util.logging.resources.logging;
 
 public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTeam> {
 	public static enum Behavior { EXPLORING, RESCUEING };
@@ -37,6 +35,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         market = new MarketComponent(me(), model);
         market.log("Connected. At pos " + me().getPosition());
         market.init();
+        behavior = Behavior.EXPLORING;
     }
 
 	@Override
@@ -49,7 +48,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
             sendSubscribe(time, MarketComponent.MARKET_CHANNEL);
         }
     	
-    	// Send ONE market message if there are any waiting.
+    	// Send ALL market messages
     	while (market.hasMessage()) {
     		String msg = market.nextMessage();
     		market.log("sending: \"" + msg + "\"");
@@ -58,17 +57,19 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	
 		reportCivilian(changed, time);
 
-    	if (market.reachedGoal(market.getCurrentTask().goal)) {
-    		market.onGoal();
-    		String position = "c:" + me().getPosition().getValue();
-    		sendSpeak(time, 1, position.getBytes());
-    	}
-    	else {
-            EntityID pos = me().getPosition();
-            List<EntityID> path = search.
-            		breadthFirstSearch(pos, market.getCurrentTask().goal);
-			sendMove(time, path);
-    	}
+		if (behavior == Behavior.EXPLORING) {
+	    	if (market.reachedGoal(market.getCurrentTask().goal)) {
+	    		market.onGoal();
+	    		String position = "c:" + me().getPosition().getValue();
+	    		sendSpeak(time, 1, position.getBytes());
+	    	}
+	    	else {
+	            EntityID pos = me().getPosition();
+	            List<EntityID> path = search.
+	            		breadthFirstSearch(pos, market.getCurrentTask().goal);
+				sendMove(time, path);
+	    	}
+		}
     	
         for (Command next : heard) {
 			AKSpeak cmd = market.parseCommand(next);
@@ -94,7 +95,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         }
     }
 
-	// Message string: "f:<pos>
+	// Message string: "f:<pos>"
 	private void reportCivilian(ChangeSet changed, int time) {
 		for (EntityID id : changed.getChangedEntities()) {
 			StandardEntity entity = model.getEntity(id);

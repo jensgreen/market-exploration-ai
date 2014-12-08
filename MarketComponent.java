@@ -58,18 +58,20 @@ public class MarketComponent {
 		// Log for debugging
 		String onGoalString =
 				(currentTask == null ? "" : "On goal " + currentTask.toString() + ". ");
-		log(onGoalString + "Generating " + numNewTasks + " new tasks");
 		
 		// Generate new tasks
 		LinkedList<ExplorationTask> newTasks = new LinkedList<ExplorationTask>();
 		newTasks.addAll(generateRandomTasks(numNewTasks));
 		removeUnwantedTasks(newTasks);
+		log(onGoalString + "Generating " + numNewTasks + " new tasks: " + newTasks.toString());
+
 		
 		// create and order new tour with new tasks inserted
 		addToTour(newTasks);
 		// set current goal, then auction the rest
 		this.currentTask = tour.getNodes().poll();
 		createAuctions(tour);
+		
 	}
 	
 	private void addToTour(ExplorationTask task) {
@@ -124,7 +126,7 @@ public class MarketComponent {
 		}
 		// second loop to avoid concurrent modification exception
 		for (Auction a : timedOut) {
-//			log("Timed out: " + a.toString());
+			log("Timed out: " + a.toString());
 			endAuction(a);
 		}
 	}
@@ -132,10 +134,10 @@ public class MarketComponent {
 	private void sell(AuctionClosing closing) {
 		if (closing.winner.equals(this.getID())) {
 			// TODO do nothing?
-//			log("Selling to self: " + closing.toString());
+			log("Selling to self: " + closing.toString());
 		}
 		else {
-//			log("Selling to other: " + closing.toString());
+			log("Selling to other: " + closing.toString());
 			broadcast(closing);
 		}
 	}
@@ -165,7 +167,7 @@ public class MarketComponent {
 
 	public AuctionOpening openAuction(Auction au) {
 		auctions.add(au);
-//		log("Opening auction: " + au.toString());
+		log("Opening auction: " + au.toString());
 		AuctionOpening opening = au.open();
 		broadcast(opening);
 		return opening;
@@ -215,6 +217,7 @@ public class MarketComponent {
 		AuctionClosing closing = a.close();
 		sell(closing);
 		auctions.remove(a);
+		tour.getNodes().remove(a.item);
 	}
 
 	public void handleAuctionOpening(AKSpeak cmd) {
