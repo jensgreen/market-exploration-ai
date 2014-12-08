@@ -124,7 +124,7 @@ public class MarketComponent {
 		}
 		// second loop to avoid concurrent modification exception
 		for (Auction a : timedOut) {
-			log("Timed out: " + a.toString());
+//			log("Timed out: " + a.toString());
 			endAuction(a);
 		}
 	}
@@ -132,10 +132,10 @@ public class MarketComponent {
 	private void sell(AuctionClosing closing) {
 		if (closing.winner.equals(this.getID())) {
 			// TODO do nothing?
-			log("Selling to self: " + closing.toString());
+//			log("Selling to self: " + closing.toString());
 		}
 		else {
-			log("Selling to other: " + closing.toString());
+//			log("Selling to other: " + closing.toString());
 			broadcast(closing);
 		}
 	}
@@ -165,7 +165,7 @@ public class MarketComponent {
 
 	public AuctionOpening openAuction(Auction au) {
 		auctions.add(au);
-		log("Opening auction: " + au.toString());
+//		log("Opening auction: " + au.toString());
 		AuctionOpening opening = au.open();
 		broadcast(opening);
 		return opening;
