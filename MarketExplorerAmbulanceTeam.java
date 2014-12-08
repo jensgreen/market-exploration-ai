@@ -94,7 +94,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         }
     }
 
-
+	// Message string: "f:<pos>
 	private void reportCivilian(ChangeSet changed, int time) {
 		for (EntityID id : changed.getChangedEntities()) {
 			StandardEntity entity = model.getEntity(id);
@@ -102,7 +102,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 				Civilian civ = (Civilian) entity;
 				
 				if (!civilianInRefuge(civ) && (civ.getBuriedness() > 0 || civ.getDamage() > 0)) {
-					String msg = "ci:" + civ.getPosition().getValue();
+					String msg = "f:" + civ.getPosition().getValue();
 					sendSpeak(time, 1, msg.getBytes());
 				}
 			}
