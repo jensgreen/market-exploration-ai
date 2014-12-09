@@ -8,6 +8,7 @@ import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 
+import navigation.NavigationModule;
 import rescuecore2.messages.Command;
 import rescuecore2.standard.entities.AmbulanceTeam;
 import rescuecore2.standard.entities.StandardEntity;
@@ -27,14 +28,17 @@ public class MarketComponent {
 	private final List<Auction> auctions = new LinkedList<Auction>();
 	private final Queue<String> marketMessages = new LinkedList<String>();
 	private final StandardWorldModel model;
+	private final NavigationModule nav;
 	private final AmbulanceTeam agent;
-	private Tour tour = Tour.empty();
+	private Tour tour;
 	private ExplorationTask currentTask;
 	private int time;
 
-	public MarketComponent(AmbulanceTeam agent, StandardWorldModel model) {
+	public MarketComponent(AmbulanceTeam agent, StandardWorldModel model, NavigationModule nav) {
 		this.agent = agent;
 		this.model = model;
+		this.nav = nav;
+		this.tour = Tour.empty(nav);
 	}
 
 	public void init() {
@@ -77,13 +81,13 @@ public class MarketComponent {
 	private void addToTour(ExplorationTask task) {
 		List<ExplorationTask> list = this.tour.getNodes();
 		list.add(task);
-		this.tour = Tour.greedy(list, getID(), model);
+		this.tour = Tour.greedy(list, me().getPosition(), model, nav);
 	}
 	
 	private void addToTour(List<ExplorationTask> tasks) {
 		List<ExplorationTask> list = this.tour.getNodes();
 		list.addAll(tasks);
-		this.tour = Tour.greedy(list, getID(), model);
+		this.tour = Tour.greedy(list, me().getPosition(), model, nav);
 	}
 	
 	public String nextMessage() {

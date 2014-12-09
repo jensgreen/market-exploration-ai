@@ -4,16 +4,19 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import navigation.NavigationModule;
 import rescuecore2.standard.entities.StandardWorldModel;
 import rescuecore2.worldmodel.EntityID;
 
 public final class Tour {
 	private final LinkedList<ExplorationTask> nodes;
 	private final int[] costs;
+	private NavigationModule nav;
 	
-	private Tour(LinkedList<ExplorationTask> nodes, int[] costs) {
+	private Tour(LinkedList<ExplorationTask> nodes, int[] costs, NavigationModule nav) {
 		this.nodes = nodes;
 		this.costs = costs;
+		this.nav = nav;
 	}
 
 	public LinkedList<ExplorationTask> getNodes() {
@@ -28,8 +31,16 @@ public final class Tour {
 	public int costToAdd(EntityID node, StandardWorldModel world) {
 		int bestCost = Integer.MAX_VALUE;
 		
+		for (int i = 0; i < nodes.size(); i++) {
+			int cost = Tour.cost(nodes.get(i).goal, node, nav);
+			if (i < nodes.size() - 1) cost += Tour.cost(node, nodes.get(i+1).goal, nav);
+			if (cost < bestCost) {
+				bestCost = cost;
+			}
+		}
+		
 		for (ExplorationTask task : this.nodes) {
-			int cost = world.getDistance(task.goal, node);
+			int cost = Tour.cost(task.goal, node, nav); // TODO should be cost of (old) --> (new) --> (old+1)
 			if (cost < bestCost) {
 				bestCost = cost;
 			}
@@ -38,35 +49,35 @@ public final class Tour {
 	}
 	
 	/** Construct a Hamilton path visiting all nodes using a greedy heuristic in O(n^2). */
-	public static Tour greedy(List<ExplorationTask> nodes, EntityID start, StandardWorldModel world) {
+	public static Tour greedy(List<ExplorationTask> nodes, EntityID start, StandardWorldModel world, NavigationModule nav) {
 		if (nodes.size() == 0) {
-			return Tour.empty();
+			return Tour.empty(nav);
 		}
 		
 		LinkedList<ExplorationTask> tasks = new LinkedList<ExplorationTask>();
 		LinkedList<ExplorationTask> unvisited = new LinkedList<ExplorationTask>(nodes);
 		
 		// Find first node -- special case
-		Tour.greedyAdd(start, tasks, unvisited, world);
-		// Find remaing nodes
+		Tour.greedyAdd(start, tasks, unvisited, world, nav);
+		// Find remaining nodes
 		while (!unvisited.isEmpty()) {
-			greedyAdd(tasks.getLast().goal, tasks, unvisited, world);
+			greedyAdd(tasks.getLast().goal, tasks, unvisited, world, nav);
 		}
 		
-		Tour tour = new Tour(tasks, Tour.buildCosts(tasks, start, world)); 
+		Tour tour = new Tour(tasks, Tour.buildCosts(tasks, start, world, nav), nav); 
 		return tour;
 	}
 
 	/** Greedily adds best node (from lastNode) from unvisited to tour, remove found node from unvisited.
 	 * @return cost of the addition. */ 
 	private static int greedyAdd(EntityID lastNode, LinkedList<ExplorationTask> tour,
-			LinkedList<ExplorationTask> unvisited, StandardWorldModel world) {
+			LinkedList<ExplorationTask> unvisited, StandardWorldModel world, NavigationModule nav) {
 		ExplorationTask bestTask = null;
 		int bestCost = Integer.MAX_VALUE;
 		
 		// greedily assign shortest addition.
 		for (ExplorationTask candidate : unvisited) {
-			int cost = world.getDistance(lastNode, candidate.goal);
+			int cost = Tour.cost(lastNode, candidate.goal, nav);
 			if (cost < bestCost) {
 				bestTask = candidate;
 				bestCost = cost;
@@ -76,9 +87,14 @@ public final class Tour {
 		unvisited.remove(bestTask);
 		return bestCost;
 	}
+
+	private static int cost(EntityID from, EntityID to, NavigationModule nav) {
+		nav.planPathInSerialMode(from, to);
+		return nav.getPlanCost();
+	}
 	
 	private static int[] buildCosts(LinkedList<ExplorationTask> tasks, EntityID start, 
-			StandardWorldModel world) {
+			StandardWorldModel world, NavigationModule nav) {
 		if (tasks.size() <= 0)
 			throw new IllegalArgumentException("tasks must have at least one member.");
 		int[] costs = new int[tasks.size()];
@@ -86,19 +102,19 @@ public final class Tour {
 		Iterator<ExplorationTask> iter = tasks.iterator();
 		ExplorationTask prev = new ExplorationTask(start); // dummy task for starting position
 
-		costs[0] = world.getDistance(start, iter.next().goal); // node 1
+		costs[0] = Tour.cost(start, iter.next().goal, nav);
 		int counter = 1;
 		while (iter.hasNext()) {
 			ExplorationTask current = iter.next(); // start iterating at node 2
-			int cost = world.getDistance(prev.goal, current.goal);
+			int cost = Tour.cost(prev.goal, current.goal, nav);
 			costs[counter] = cost; // set cost to enter current node
 			costs[counter-1] += cost; // add cost to exit prev node
 			counter++;
 		}
 		
-		costs[0] -= world.getDistance(start, tasks.get(0).goal);
+		costs[0] -= Tour.cost(start, tasks.get(0).goal, nav);
 		for (int j = 1; j < costs.length-1; j++) {
-			int dist = world.getDistance(tasks.get(j-1).goal, tasks.get(j+1).goal);
+			int dist = Tour.cost(tasks.get(j-1).goal, tasks.get(j+1).goal, nav);
 
 			if (dist > costs[j]) costs[j] = 0; // prevent negative costs.
 			else costs[j] -= dist;
@@ -108,8 +124,8 @@ public final class Tour {
 		return costs;
 	}
 
-	public static Tour empty() {
-		return new Tour(new LinkedList<ExplorationTask>(), new int[0]);
+	public static Tour empty(NavigationModule nav) {
+		return new Tour(new LinkedList<ExplorationTask>(), new int[0], nav);
 	}
 
 }

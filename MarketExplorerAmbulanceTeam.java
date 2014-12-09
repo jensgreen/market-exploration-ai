@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 
+import navigation.NavigationModule;
 import rescuecore2.messages.Command;
 import rescuecore2.standard.entities.AmbulanceTeam;
 import rescuecore2.standard.entities.Civilian;
@@ -21,6 +22,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	
 	private MarketComponent market;
 	private Behavior behavior;
+	private NavigationModule nav;
 
     @Override
     public String toString() {
@@ -32,7 +34,8 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         super.postConnect();
         //TODO look over this list
         model.indexClass(StandardEntityURN.CIVILIAN, StandardEntityURN.FIRE_BRIGADE, StandardEntityURN.POLICE_FORCE, StandardEntityURN.AMBULANCE_TEAM, StandardEntityURN.REFUGE,StandardEntityURN.HYDRANT,StandardEntityURN.GAS_STATION, StandardEntityURN.BUILDING, StandardEntityURN.ROAD);
-        market = new MarketComponent(me(), model);
+        nav = new NavigationModule(model);
+        market = new MarketComponent(me(), model, nav);
         market.log("Connected. At pos " + me().getPosition());
         market.init();
         behavior = Behavior.EXPLORING;
@@ -57,16 +60,17 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	
 		reportCivilian(changed, time);
 
+        EntityID pos = me().getPosition();
 		if (behavior == Behavior.EXPLORING) {
-	    	if (market.reachedGoal(market.getCurrentTask().goal)) {
+	    	if (market.reachedGoal(market.getCurrentTask().goal) && !nav.isPlanningPath()) {
 	    		market.onGoal();
 	    		String position = "c:" + me().getPosition().getValue();
 	    		sendSpeak(time, 1, position.getBytes());
+	    		nav.planPathTo(pos, market.getCurrentTask().goal);
 	    	}
-	    	else {
-	            EntityID pos = me().getPosition();
-	            List<EntityID> path = search.
-	            		breadthFirstSearch(pos, market.getCurrentTask().goal);
+	    	else if (nav.isPlanReady()) {
+				nav.uppdatePath(pos);
+				List<EntityID> path = nav.getPlan();
 				sendMove(time, path);
 	    	}
 		}
