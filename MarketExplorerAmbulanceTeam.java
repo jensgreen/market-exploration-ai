@@ -84,7 +84,8 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 				msg = new String(cmd.getContent(), "UTF-8");
 			} catch (UnsupportedEncodingException e) {
 				// Rethrow to detect when and if this fails.
-				throw new RuntimeException("Cannot parse message content",e);
+				market.log("Cannot parse message content");
+				return;
 			}
 			
 			if (msg.startsWith("ci:"))

@@ -201,19 +201,25 @@ public class MarketComponent {
 	}
 
 	public void handleBid(AKSpeak cmd) {
-    	Bid bid = Bid.fromMessage(cmd);
-    	for (Auction a : auctions) {
-			if (a.item.equals(bid.item)) {
-				// Found auction.
-				// Add bid, (close auction), then return
-				
-//				log("Received bid on " + a.toString() + ". Bidder: " + bid.bidder.toString());
-				a.addBid(bid);
-				if(a.numBids() >= a.expectedNumBids()) {
-					endAuction(a);
+		Bid bid; 
+		try {
+			bid = Bid.fromMessage(cmd);
+	    	for (Auction a : auctions) {
+				if (a.item.equals(bid.item)) {
+					// Found auction.
+					// Add bid, (close auction), then return
+					
+	//				log("Received bid on " + a.toString() + ". Bidder: " + bid.bidder.toString());
+					a.addBid(bid);
+					if(a.numBids() >= a.expectedNumBids()) {
+						endAuction(a);
+					}
+					return;
 				}
-				return;
 			}
+		} catch (RuntimeException e) {
+			log("Error parsing bid!");
+			return;
 		}
 	}
 
@@ -225,20 +231,32 @@ public class MarketComponent {
 	}
 
 	public void handleAuctionOpening(AKSpeak cmd) {
-		AuctionOpening ao = AuctionOpening.fromMessage(cmd);
-		int cost = tour.costToAdd(ao.item.goal, model);
-		if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
-			placeBid(ao, cost);
-		} else {
-//			log("Did not place bid. Cost=" + cost + " reserve=" + ao.reservePrice);
+		AuctionOpening ao;
+		try {
+			ao = AuctionOpening.fromMessage(cmd);
+			int cost = tour.costToAdd(ao.item.goal, model);
+			if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
+				placeBid(ao, cost);
+			} else {
+	//			log("Did not place bid. Cost=" + cost + " reserve=" + ao.reservePrice);
+			}
+		} catch (RuntimeException e) {
+			log("Error parsing auction opening!");
+			return;
 		}
 	}
 	
 	public void handleAuctionClosing(AKSpeak cmd) {
-		AuctionClosing ac = AuctionClosing.fromMessage(cmd);
-		if (!ac.winner.equals(this.getID())) return; // someone elses bid
-		addToTour(ac.item);
-		log("Won auction ->" + ac.item.goal.toString() + ". Added to tour.");
+		AuctionClosing ac = null;
+		try {
+			ac = AuctionClosing.fromMessage(cmd);
+			if (!ac.winner.equals(this.getID())) return; // someone elses bid
+			addToTour(ac.item);
+			log("Won auction ->" + ac.item.goal.toString() + ". Added to tour.");
+		} catch (RuntimeException e) {
+			log("Error parsing auction closing!");
+			return;
+		}
 	}
 
 	public boolean reachedGoal(EntityID goal) {
