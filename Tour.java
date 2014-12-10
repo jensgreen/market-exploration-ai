@@ -32,15 +32,15 @@ public final class Tour {
 		int bestCost = Integer.MAX_VALUE;
 		
 		for (int i = 0; i < nodes.size(); i++) {
-			int cost = Tour.cost(nodes.get(i).goal, node, nav);
-			if (i < nodes.size() - 1) cost += Tour.cost(node, nodes.get(i+1).goal, nav);
+			int cost = Tour.cost(nodes.get(i).goal, node, nav, world);
+			if (i < nodes.size() - 1) cost += Tour.cost(node, nodes.get(i+1).goal, nav, world);
 			if (cost < bestCost) {
 				bestCost = cost;
 			}
 		}
 		
 		for (ExplorationTask task : this.nodes) {
-			int cost = Tour.cost(task.goal, node, nav); // TODO should be cost of (old) --> (new) --> (old+1)
+			int cost = Tour.cost(task.goal, node, nav, world); // TODO should be cost of (old) --> (new) --> (old+1)
 			if (cost < bestCost) {
 				bestCost = cost;
 			}
@@ -77,7 +77,7 @@ public final class Tour {
 		
 		// greedily assign shortest addition.
 		for (ExplorationTask candidate : unvisited) {
-			int cost = Tour.cost(lastNode, candidate.goal, nav);
+			int cost = Tour.cost(lastNode, candidate.goal, nav, world);
 			if (cost < bestCost) {
 				bestTask = candidate;
 				bestCost = cost;
@@ -88,9 +88,10 @@ public final class Tour {
 		return bestCost;
 	}
 
-	private static int cost(EntityID from, EntityID to, NavigationModule nav) {
-		nav.planPathInSerialMode(from, to);
-		return nav.getPlanCost();
+	private static int cost(EntityID from, EntityID to, NavigationModule nav, StandardWorldModel world) {
+//		nav.planPathInSerialMode(from, to);
+//		return nav.getPlanCost();
+		return world.getDistance(from, to);
 	}
 	
 	private static int[] buildCosts(LinkedList<ExplorationTask> tasks, EntityID start, 
@@ -102,19 +103,19 @@ public final class Tour {
 		Iterator<ExplorationTask> iter = tasks.iterator();
 		ExplorationTask prev = new ExplorationTask(start); // dummy task for starting position
 
-		costs[0] = Tour.cost(start, iter.next().goal, nav);
+		costs[0] = Tour.cost(start, iter.next().goal, nav, world);
 		int counter = 1;
 		while (iter.hasNext()) {
 			ExplorationTask current = iter.next(); // start iterating at node 2
-			int cost = Tour.cost(prev.goal, current.goal, nav);
+			int cost = Tour.cost(prev.goal, current.goal, nav, world);
 			costs[counter] = cost; // set cost to enter current node
 			costs[counter-1] += cost; // add cost to exit prev node
 			counter++;
 		}
 		
-		costs[0] -= Tour.cost(start, tasks.get(0).goal, nav);
+		costs[0] -= Tour.cost(start, tasks.get(0).goal, nav, world);
 		for (int j = 1; j < costs.length-1; j++) {
-			int dist = Tour.cost(tasks.get(j-1).goal, tasks.get(j+1).goal, nav);
+			int dist = Tour.cost(tasks.get(j-1).goal, tasks.get(j+1).goal, nav, world);
 
 			if (dist > costs[j]) costs[j] = 0; // prevent negative costs.
 			else costs[j] -= dist;

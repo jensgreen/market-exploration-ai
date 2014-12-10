@@ -38,6 +38,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         market = new MarketComponent(me(), model, nav);
         market.log("Connected. At pos " + me().getPosition());
         market.init();
+        nav.planPathTo(me().getPosition(), market.getCurrentTask().goal);
         behavior = Behavior.EXPLORING;
     }
 
