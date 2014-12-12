@@ -25,6 +25,8 @@ import sample.ObservedType;
 public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTeam> {
 	public static enum Behavior { EXPLORING, RESCUEING };
 	
+	public static boolean USE_CUSTOM_NAV = true;
+	
 	private MarketComponent market;
 	private Behavior behavior;
 	private NavigationModule nav;
@@ -45,7 +47,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         market = new MarketComponent(me(), model, nav);
         market.log("Connected. At pos " + me().getPosition());
         market.init();
-        nav.planPathTo(me().getPosition(), market.getCurrentTask().goal);
+        nav.planPathInSerialMode(me().getPosition(), market.getCurrentTask().goal);
         behavior = Behavior.EXPLORING;
     }
 
@@ -54,10 +56,12 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 		market.tick(time);
 		market.updateWorld(changed);
 //    	log("thinking...");
+		market.log("pos:" + me().getPosition().toString());
     	
     	if (time == config.getIntValue(kernel.KernelConstants.IGNORE_AGENT_COMMANDS_KEY)) {
             sendSubscribe(time, MarketComponent.MARKET_CHANNEL);
         }
+    	if (time <= 3) return;
     	
     	// Send ALL market messages
     	while (market.hasMessage()) {
@@ -77,14 +81,25 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	    		market.onGoal();
 	    		String position = "c:" + me().getPosition().getValue();
 	    		sendSpeak(time, 1, position.getBytes());
-	    		nav.planPathTo(pos, market.getCurrentTask().goal);
+	    		if (USE_CUSTOM_NAV) {
+	    			nav.planPathTo(pos, market.getCurrentTask().goal);
+	    		}
 	    	}
-	    	else if (nav.isPlanReady()) {
+	    	else if (USE_CUSTOM_NAV && nav.isPlanReady()) {
 				nav.uppdatePath(pos);
-//				List<EntityID> path = nav.getPlan();
+
+				if (nav.isPlanReady()) {
+					List<EntityID> path = nav.getPlan();
+//					market.log(">>>>>moving: " + me().getPosition() + " --> " + market.getCurrentTask().goal);
+					nav.printpath();
+					sendMove(time, path);
+				}
+	    	}
+	    	
+	    	if (!USE_CUSTOM_NAV) {
 				List<EntityID> path = search.
 						breadthFirstSearch(pos, market.getCurrentTask().goal);
-				sendMove(time, path);
+	    		sendMove(time, path);
 	    	}
 		}
     	
@@ -110,7 +125,6 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 			String[] msgParts = readableMsg.substring(0, readableMsg.length() - 2).split("d");
 			// Message is correct here. Split into msgParts array.
 			
-			System.err.println("MSGPARTS" + msgParts);
 			int[] msgInts = new int[msgParts.length];
 			for (int i = 0; i < msgParts.length; i++) {
 				msgInts[i] = Integer.parseInt(msgParts[i]);

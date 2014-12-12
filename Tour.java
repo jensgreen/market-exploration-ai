@@ -89,9 +89,13 @@ public final class Tour {
 	}
 
 	private static int cost(EntityID from, EntityID to, NavigationModule nav, StandardWorldModel world) {
-//		nav.planPathInSerialMode(from, to);
-//		return nav.getPlanCost();
-		return world.getDistance(from, to);
+		if (MarketExplorerAmbulanceTeam.USE_CUSTOM_NAV) {
+			nav.planPathInSerialMode(from, to);
+			return nav.getPlanCost();
+		}
+		else {
+			return world.getDistance(from, to);
+		}
 	}
 	
 	private static int[] buildCosts(LinkedList<ExplorationTask> tasks, EntityID start, 
