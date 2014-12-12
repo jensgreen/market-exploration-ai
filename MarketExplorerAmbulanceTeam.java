@@ -1,6 +1,7 @@
 package exploration;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
@@ -61,10 +62,11 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	// Send ALL market messages
     	while (market.hasMessage()) {
     		String msg = market.nextMessage();
+    		msg = new String(msg.getBytes(), StandardCharsets.ISO_8859_1);
     		String clear = CommunicationEncoding.addSecurity(msg);
     		String code =  CommunicationEncoding.clearToCode(clear);
     		market.log("sending: \"" + code + "\"");
-			sendSpeak(time, MarketComponent.MARKET_CHANNEL, code.getBytes());
+			sendSpeak(time, MarketComponent.MARKET_CHANNEL, code.getBytes(StandardCharsets.ISO_8859_1));
 		}
     	
 		reportCivilian(changed, time);
@@ -90,7 +92,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 			AKSpeak cmd = market.parseCommand(next);
 			if (cmd.getAgentID().equals(getID())) continue; // skip own messages
 			
-			String encodedMsg = new String(cmd.getContent());
+			String encodedMsg = new String(cmd.getContent(), StandardCharsets.ISO_8859_1);
 			String readableMsg = CommunicationEncoding.codeToClear(encodedMsg);
 			market.log("enc:" + encodedMsg);
 			market.log("dec:" + readableMsg + ";");
