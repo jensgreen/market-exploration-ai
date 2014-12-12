@@ -18,6 +18,8 @@ import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
 import rescuecore2.worldmodel.Property;
+import sample.MsgReceiver;
+import sample.MsgType;
 
 public class MarketComponent {
 	public static final int MARKET_CHANNEL = 2;
@@ -200,10 +202,10 @@ public class MarketComponent {
 		return ((AKSpeak)next);
 	}
 
-	public void handleBid(AKSpeak cmd) {
+	public void handleBid(int[] msgInts, EntityID sender) {
 		Bid bid; 
 		try {
-			bid = Bid.fromMessage(cmd);
+			bid = Bid.fromMessage(msgInts, sender);
 	    	for (Auction a : auctions) {
 				if (a.item.equals(bid.item)) {
 					// Found auction.
@@ -230,10 +232,10 @@ public class MarketComponent {
 		tour.getNodes().remove(a.item);
 	}
 
-	public void handleAuctionOpening(AKSpeak cmd) {
+	public void handleAuctionOpening(int[] msgInts, EntityID sender) {
 		AuctionOpening ao;
 		try {
-			ao = AuctionOpening.fromMessage(cmd);
+			ao = AuctionOpening.fromMessage(msgInts, sender);
 			int cost = tour.costToAdd(ao.item.goal, model);
 			if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
 				placeBid(ao, cost);
@@ -246,10 +248,10 @@ public class MarketComponent {
 		}
 	}
 	
-	public void handleAuctionClosing(AKSpeak cmd) {
+	public void handleAuctionClosing(int[] msgInts, EntityID sender) {
 		AuctionClosing ac = null;
 		try {
-			ac = AuctionClosing.fromMessage(cmd);
+			ac = AuctionClosing.fromMessage(msgInts, sender);
 			if (!ac.winner.equals(this.getID())) return; // someone elses bid
 			addToTour(ac.item);
 			log("Won auction ->" + ac.item.goal.toString() + ". Added to tour.");
@@ -265,16 +267,23 @@ public class MarketComponent {
 		return (model.getDistance(getID(), goal) < 1000);
 	}
 
-	public boolean isBid(String msg) {
-		return msg.startsWith("bi:");
+	public boolean handleMessage(int recievers) {
+    	return (recievers ==  MsgReceiver.Ambulance.getInt()) || (recievers ==  MsgReceiver.All.getInt());
+	}
+	
+	public boolean isBid(int recievers) {
+		return recievers == MsgType.Bid.getInt();
+//    	return msg.startsWith("bi:");
 	}
 
-    public boolean isAuctionOpening(String msg) {
-    	return msg.startsWith("ao:");
+	public boolean isAuctionOpening(int recievers) {
+		return recievers == MsgType.StartAuction.getInt();
+//    	return msg.startsWith("ao:");
     }
 
-	public boolean isAuctionClosing(String msg) {
-		return msg.startsWith("ac:");
+	public boolean isAuctionClosing(int recievers) {
+		return recievers == MsgType.FinishAuction.getInt();
+//		return msg.startsWith("ac:");
 	}
 	
 	

@@ -1,9 +1,9 @@
 package exploration;
 
-import java.io.UnsupportedEncodingException;
-
-import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.EntityID;
+import sample.CommunicationEncoding;
+import sample.MsgReceiver;
+import sample.MsgType;
 
 //Message string: "ac:<item>:<winner>"
 public final class AuctionClosing {
@@ -26,30 +26,22 @@ public final class AuctionClosing {
 	}
 	
 	public String toMessageString() {
-		StringBuilder sb = new StringBuilder("ac:");
+		StringBuilder sb = new StringBuilder();
+		sb.append(MsgReceiver.Ambulance.getInt());
+		sb.append("d");
+		sb.append(MsgType.FinishAuction.getInt());
+		sb.append("d");
 		sb.append(item.goal.toString());
-		sb.append(":");
+		sb.append("d");
 		sb.append(winner.getValue());
+		sb.append("d");
 		return sb.toString();
 	}
 	
-	public static final AuctionClosing fromMessage(AKSpeak msg) {
-		String str = null;
-		try {
-			str = new String(msg.getContent(), "UTF-8");
-		} catch (UnsupportedEncodingException e) {
-			// Rethrow to detect when and if this fails.
-			throw new RuntimeException("Cannot parse message content",e);
-		}
-		String[] split = str.split(":");
-		// split == [String commandID, EntityID int item, EntityID in winner]		
-
-		EntityID itemID = new EntityID(Integer.parseInt(split[1]));
+	public static final AuctionClosing fromMessage(int[] split, EntityID winner) {
+		EntityID itemID = new EntityID(split[2]);
 		ExplorationTask item = new ExplorationTask(itemID);
-		
-		EntityID winnerID = new EntityID(Integer.parseInt(split[2]));		
-		
-		return new AuctionClosing(item, winnerID);
+		return new AuctionClosing(item, winner);
 	}
 	
 	@Override

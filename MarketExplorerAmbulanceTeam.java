@@ -16,6 +16,10 @@ import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
 import sample.AbstractSampleAgent;
+import sample.CommunicationEncoding;
+import sample.MsgReceiver;
+import sample.MsgType;
+import sample.ObservedType;
 
 public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTeam> {
 	public static enum Behavior { EXPLORING, RESCUEING };
@@ -34,6 +38,8 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         super.postConnect();
         //TODO look over this list
         model.indexClass(StandardEntityURN.CIVILIAN, StandardEntityURN.FIRE_BRIGADE, StandardEntityURN.POLICE_FORCE, StandardEntityURN.AMBULANCE_TEAM, StandardEntityURN.REFUGE,StandardEntityURN.HYDRANT,StandardEntityURN.GAS_STATION, StandardEntityURN.BUILDING, StandardEntityURN.ROAD);
+        
+        new CommunicationEncoding(); // init communication codebook
         nav = new NavigationModule(model);
         market = new MarketComponent(me(), model, nav);
         market.log("Connected. At pos " + me().getPosition());
@@ -55,8 +61,10 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     	// Send ALL market messages
     	while (market.hasMessage()) {
     		String msg = market.nextMessage();
-    		market.log("sending: \"" + msg + "\"");
-			sendSpeak(time, MarketComponent.MARKET_CHANNEL, msg.getBytes());
+    		String clear = CommunicationEncoding.addSecurity(msg);
+    		String code =  CommunicationEncoding.clearToCode(clear);
+    		market.log("sending: \"" + code + "\"");
+			sendSpeak(time, MarketComponent.MARKET_CHANNEL, code.getBytes());
 		}
     	
 		reportCivilian(changed, time);
@@ -71,7 +79,9 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 	    	}
 	    	else if (nav.isPlanReady()) {
 				nav.uppdatePath(pos);
-				List<EntityID> path = nav.getPlan();
+//				List<EntityID> path = nav.getPlan();
+				List<EntityID> path = search.
+						breadthFirstSearch(pos, market.getCurrentTask().goal);
 				sendMove(time, path);
 	    	}
 		}
@@ -79,29 +89,52 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         for (Command next : heard) {
 			AKSpeak cmd = market.parseCommand(next);
 			if (cmd.getAgentID().equals(getID())) continue; // skip own messages
-			String msg = null;
-			try {
-				msg = new String(cmd.getContent(), "UTF-8");
-			} catch (UnsupportedEncodingException e) {
-				// Rethrow to detect when and if this fails.
-				market.log("Cannot parse message content");
-				return;
+			
+			String encodedMsg = new String(cmd.getContent());
+			String readableMsg = CommunicationEncoding.codeToClear(encodedMsg);
+			market.log("enc:" + encodedMsg);
+			market.log("dec:" + readableMsg + ";");
+			
+			if (readableMsg == null || "".equals(readableMsg) || readableMsg.length() == 0) {
+				System.err.println("Cannot parse message content.");
+				continue;
 			}
 			
-			if (msg.startsWith("ci:"))
-				market.log("heard:" + msg);
+			if (!CommunicationEncoding.isMsgCorrect(readableMsg)) {
+				System.err.println("Message security bit error.");
+				continue;
+			}
 			
-            if (market.isBid(msg)) {
-            	market.handleBid(cmd);
-            } else if (market.isAuctionOpening(msg)) {
-            	market.handleAuctionOpening(cmd);
-            } else if (market.isAuctionClosing(msg)) {
-            	market.handleAuctionClosing(cmd);
-            }
+			String[] msgParts = readableMsg.substring(0, readableMsg.length() - 2).split("d");
+			// Message is correct here. Split into msgParts array.
+			
+			System.err.println("MSGPARTS" + msgParts);
+			int[] msgInts = new int[msgParts.length];
+			for (int i = 0; i < msgParts.length; i++) {
+				msgInts[i] = Integer.parseInt(msgParts[i]);
+			}
+			
+			// TODO !
+//			if (readableMsg.startsWith("ci:"))
+//				market.log("heard:" + readableMsg);
+			
+			// handle at all?
+			if (market.handleMessage(msgInts[0])) {
+				
+				EntityID sender = cmd.getAgentID();
+				
+				// handle corrent msg type
+	            if (market.isBid(msgInts[1])) {
+	            	market.handleBid(msgInts, sender);
+	            } else if (market.isAuctionOpening(msgInts[1])) {
+	            	market.handleAuctionOpening(msgInts, sender);
+	            } else if (market.isAuctionClosing(msgInts[1])) {
+	            	market.handleAuctionClosing(msgInts, sender);
+	            }
+			}
         }
     }
 
-	// Message string: "f:<pos>"
 	private void reportCivilian(ChangeSet changed, int time) {
 		for (EntityID id : changed.getChangedEntities()) {
 			StandardEntity entity = model.getEntity(id);
@@ -109,7 +142,18 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 				Civilian civ = (Civilian) entity;
 				
 				if (!civilianInRefuge(civ) && (civ.getBuriedness() > 0 || civ.getDamage() > 0)) {
-					String msg = "f:" + civ.getPosition().getValue();
+					StringBuilder sb = new StringBuilder();
+					sb.append(MsgReceiver.Ambulance.getInt());
+					sb.append("d");
+					sb.append(MsgType.Observation.getInt());
+					sb.append("d");
+					sb.append(ObservedType.Civilian);
+					sb.append("d");
+					sb.append(civ.getPosition().getValue());
+					sb.append("d");
+					String s = CommunicationEncoding.addSecurity(sb.toString());
+					String msg =  CommunicationEncoding.clearToCode(s);
+					
 					sendSpeak(time, 1, msg.getBytes());
 				}
 			}
