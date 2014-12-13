@@ -1,6 +1,5 @@
 package exploration;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -25,7 +24,7 @@ import sample.ObservedType;
 public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTeam> {
 	public static enum Behavior { EXPLORING, RESCUEING };
 	
-	public static boolean USE_CUSTOM_NAV = true;
+	public static boolean USE_CUSTOM_NAV = false;
 	
 	private MarketComponent market;
 	private Behavior behavior;
@@ -45,7 +44,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         System.out.println(getID() + ": Connected. At pos " + me().getPosition());
         new CommunicationEncoding(); // init communication codebook
         nav = new NavigationModule(model);
-        market = new MarketComponent(me(), model, nav);
+        market = new MarketComponent(me(), model, nav, search);
         behavior = Behavior.EXPLORING;
     }
 
@@ -57,12 +56,13 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
             sendSubscribe(time, MarketComponent.MARKET_CHANNEL);
         }
 
-    	if (time <= 3) return;
-    	else if(time == 3) {
+    	final int START_TIME = 4;
+    	if (time < START_TIME) return;
+    	else if(time == START_TIME) {
             market.init();
-            nav.planPathInSerialMode(me().getPosition(), market.getCurrentTask().goal);
+            nav.planPathTo(me().getPosition(), market.getCurrentTask().goal);
 		}
-		else if (time > 3) {
+		else if (time > START_TIME) {
 			market.tick(time);
 			market.updateWorld(changed);
 		}
@@ -75,7 +75,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
     		msg = new String(msg.getBytes(), StandardCharsets.ISO_8859_1);
     		String clear = CommunicationEncoding.addSecurity(msg);
     		String code =  CommunicationEncoding.clearToCode(clear);
-    		market.log("sending: \"" + code + "\"");
+    		market.log("sending: \"" + msg + "\"");
 			sendSpeak(time, MarketComponent.MARKET_CHANNEL, code.getBytes(StandardCharsets.ISO_8859_1));
 		}
     	
@@ -97,7 +97,7 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 				if (nav.isPlanReady()) {
 					List<EntityID> path = nav.getPlan();
 //					market.log(">>>>>moving: " + me().getPosition() + " --> " + market.getCurrentTask().goal);
-					nav.printpath();
+//					nav.printpath();
 					sendMove(time, path);
 				}
 	    	}
@@ -115,8 +115,6 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
 			
 			String encodedMsg = new String(cmd.getContent(), StandardCharsets.ISO_8859_1);
 			String readableMsg = CommunicationEncoding.codeToClear(encodedMsg);
-			market.log("enc:" + encodedMsg);
-			market.log("dec:" + readableMsg + ";");
 			
 			if (readableMsg == null || "".equals(readableMsg) || readableMsg.length() == 0) {
 				System.err.println("Cannot parse message content.");

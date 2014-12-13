@@ -20,6 +20,7 @@ import rescuecore2.worldmodel.EntityID;
 import rescuecore2.worldmodel.Property;
 import sample.MsgReceiver;
 import sample.MsgType;
+import sample.SampleSearch;
 
 public class MarketComponent {
 	public static final int MARKET_CHANNEL = 2;
@@ -32,15 +33,17 @@ public class MarketComponent {
 	private final StandardWorldModel model;
 	private final NavigationModule nav;
 	private final AmbulanceTeam agent;
+	private final SampleSearch search;
 	private Tour tour;
 	private ExplorationTask currentTask;
 	private int time;
 
-	public MarketComponent(AmbulanceTeam agent, StandardWorldModel model, NavigationModule nav) {
+	public MarketComponent(AmbulanceTeam agent, StandardWorldModel model, NavigationModule nav, SampleSearch search) {
 		this.agent = agent;
 		this.model = model;
 		this.nav = nav;
 		this.tour = Tour.empty(nav);
+		this.search = search;
 	}
 
 	public void init() {
@@ -83,13 +86,13 @@ public class MarketComponent {
 	private void addToTour(ExplorationTask task) {
 		List<ExplorationTask> list = this.tour.getNodes();
 		list.add(task);
-		this.tour = Tour.greedy(list, me().getPosition(), model, nav);
+		this.tour = Tour.greedy(list, me().getPosition(), model, nav, search);
 	}
 	
 	private void addToTour(List<ExplorationTask> tasks) {
 		List<ExplorationTask> list = this.tour.getNodes();
 		list.addAll(tasks);
-		this.tour = Tour.greedy(list, me().getPosition(), model, nav);
+		this.tour = Tour.greedy(list, me().getPosition(), model, nav, search);
 	}
 	
 	public String nextMessage() {
@@ -236,7 +239,7 @@ public class MarketComponent {
 		AuctionOpening ao;
 		try {
 			ao = AuctionOpening.fromMessage(msgInts, sender);
-			int cost = tour.costToAdd(ao.item.goal, model);
+			int cost = tour.costToAdd(ao.item.goal, model, search);
 			if (ALWAYS_PLACE_BID || cost < ao.reservePrice) {
 				placeBid(ao, cost);
 			} else {
