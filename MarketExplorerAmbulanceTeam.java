@@ -41,27 +41,33 @@ public class MarketExplorerAmbulanceTeam extends AbstractSampleAgent<AmbulanceTe
         super.postConnect();
         //TODO look over this list
         model.indexClass(StandardEntityURN.CIVILIAN, StandardEntityURN.FIRE_BRIGADE, StandardEntityURN.POLICE_FORCE, StandardEntityURN.AMBULANCE_TEAM, StandardEntityURN.REFUGE,StandardEntityURN.HYDRANT,StandardEntityURN.GAS_STATION, StandardEntityURN.BUILDING, StandardEntityURN.ROAD);
-        
+
+        System.out.println(getID() + ": Connected. At pos " + me().getPosition());
         new CommunicationEncoding(); // init communication codebook
         nav = new NavigationModule(model);
         market = new MarketComponent(me(), model, nav);
-        market.log("Connected. At pos " + me().getPosition());
-        market.init();
-        nav.planPathInSerialMode(me().getPosition(), market.getCurrentTask().goal);
         behavior = Behavior.EXPLORING;
     }
 
 	@Override
     protected void think(int time, ChangeSet changed, Collection<Command> heard) {
-		market.tick(time);
-		market.updateWorld(changed);
 //    	log("thinking...");
-		market.log("pos:" + me().getPosition().toString());
     	
     	if (time == config.getIntValue(kernel.KernelConstants.IGNORE_AGENT_COMMANDS_KEY)) {
             sendSubscribe(time, MarketComponent.MARKET_CHANNEL);
         }
+
     	if (time <= 3) return;
+    	else if(time == 3) {
+            market.init();
+            nav.planPathInSerialMode(me().getPosition(), market.getCurrentTask().goal);
+		}
+		else if (time > 3) {
+			market.tick(time);
+			market.updateWorld(changed);
+		}
+
+		market.log("pos:" + me().getPosition().toString());
     	
     	// Send ALL market messages
     	while (market.hasMessage()) {
